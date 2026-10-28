@@ -35,6 +35,8 @@ Settings are saved in the browser. You can also set them in the URL:
 
 For example: `index.html?team=COV&follow=0`.
 
+The top bar shows when the page last checked the feed: every 5 s during a game and every 15 s between games. During a game it also shows how long ago the league's feed last changed, which can be a minute or more during a quiet spell.
+
 Sheffield Steelers are the default team. In automatic mode the page shows, in this order: your team's live game, your team's game for 20 minutes after the final whistle, any other live game, your team's game from earlier today, your team's game if it starts within the hour, and otherwise your team's next game.
 
 ## Where the data comes from

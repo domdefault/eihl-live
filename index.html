@@ -381,7 +381,7 @@ async function loadSchedule() {
   S.schedule = [...byId.values()].sort((a, b) => a.t - b.t || a.id - b.id);
   S.teams = new Map();
   for (const m of S.schedule) for (const t of [m.home, m.guest]) S.teams.set(t.shortcut, t);
-  fillSettings();
+  if (!$('settings').open) fillSettings();
 }
 
 const isFav = m => !!m?.home && (m.home.shortcut === cfg.team || m.guest.shortcut === cfg.team);
@@ -389,6 +389,10 @@ const windowMatches = () => { const now = Date.now(); return S.schedule.filter(m
 
 async function pollWindow() {
   const list = windowMatches();
+  // Between games, also watch my team's next game: it catches an early or moved
+  // face-off and keeps the page checking the feed instead of sitting idle.
+  const next = S.schedule.find(m => isFav(m) && m.t > Date.now());
+  if (next && !list.includes(next)) list.push(next);
   const res = await Promise.all(list.map(m => get(`matches/${m.id}/game-info.json`).catch(() => null)));
   list.forEach((m, i) => { if (res[i]) { S.infos.set(m.id, res[i].body.gameInfo); S.infosAt.set(m.id, res[i].modified); } });
   choose();
@@ -467,8 +471,9 @@ async function pollTable() {
 
 // ---------- scheduler ----------
 const tasks = {
-  schedule: { fn: loadSchedule, every: () => S.schedule.length ? 6 * HOUR : 30 * SEC },
-  window: { fn: pollWindow, every: () => (S.cur?.status === 'live' ? 20 : 30) * SEC },
+  // the per-team fixture files carry results, so re-read them often enough to show the latest one
+  schedule: { fn: loadSchedule, every: () => S.schedule.length ? 15 * MIN : 30 * SEC },
+  window: { fn: pollWindow, every: () => (S.cur?.status === 'live' ? 20 : 15) * SEC },
   match: { fn: pollMatch, every: () => !S.cur ? Infinity : S.cur.status === 'live' ? cfg.poll * SEC : S.cur.status === 'pre' ? 15 * SEC : 60 * SEC },
   extras: { fn: pollExtras, every: () => !S.cur ? Infinity : S.cur.status === 'live' ? 15 * SEC : 5 * MIN },
   table: { fn: pollTable, every: () => 10 * MIN },
@@ -617,8 +622,9 @@ function renderClock() {
   f.className = 'feed ' + (net.ok === false ? 'bad' : net.ok ? 'ok' : '');
   let txt = 'Connecting…';
   if (net.ok === false) txt = 'Connection lost · retrying';
-  else if (S.cur?.status === 'live' && S.cur.giAt) txt = `Live feed · updated ${ago(S.cur.giAt)}`;
-  else if (net.ok) txt = `Checked ${ago(net.lastOk)}`;
+  // "checked" is when this page last asked; "last change" is when the league's feed last moved
+  else if (S.cur?.status === 'live' && S.cur.giAt) txt = `Live · checked ${ago(net.lastOk)} · last change ${ago(S.cur.giAt)}`;
+  else if (net.ok) txt = `Up to date · checked ${ago(net.lastOk)}`;
   $('feedTxt').textContent = txt;
   for (const c of document.querySelectorAll('.countdown[data-t]')) c.textContent = until(+c.dataset.t);
 }
